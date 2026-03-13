@@ -10,6 +10,7 @@ import TargetedAnalysis from './components/TargetedAnalysis';
 import HistoryView from './components/HistoryView';
 import Scheduler from './components/Scheduler';
 import LogView from './components/LogView';
+import { supabase } from './services/supabaseClient';
 import { addSystemLog } from './services/logService';
 
 const App: React.FC = () => {
@@ -22,45 +23,50 @@ const App: React.FC = () => {
 
   // Simulation of auth state check
   useEffect(() => {
-    try {
-      const savedUser = localStorage.getItem('dosp_user');
-      if (savedUser) setUser(JSON.parse(savedUser));
-      
-      // Load monitors from local storage or use mock
-      const savedMonitors = localStorage.getItem('dosp_monitors');
-      if (savedMonitors) {
-        setMonitors(JSON.parse(savedMonitors));
-      } else {
-        setMonitors(MOCK_MONITORS);
-      }
+    const loadInitialData = async () => {
+      setIsLoading(true);
+      try {
+        // 1. Carregar Monitores
+        const { data: monitorsData, error: monitorsError } = await supabase
+          .from('monitors')
+          .select('*')
+          .order('name');
+        
+        if (monitorsError) throw monitorsError;
+        setMonitors(monitorsData || []);
 
-      const savedHistory = localStorage.getItem('dosp_history');
-      if (savedHistory) {
-        const parsed = JSON.parse(savedHistory) as AnalysisHistory[];
-        // Migrar datas legadas YYYY-MM-DD para DD/MM/YYYY
-        const migrated = parsed.map(h => {
-          if (h.date.includes('-')) {
-            const [y, m, d] = h.date.split('-');
-            return { ...h, date: `${d}/${m}/${y}` };
-          }
-          return h;
-        });
-        const sorted = sortHistory(migrated);
-        setHistory(sorted);
-        // Salvar versão migrada de volta para evitar reprocessamento
-        if (JSON.stringify(parsed) !== JSON.stringify(sorted)) {
-          saveToLocalStorage('dosp_history', sorted);
+        // 2. Carregar Histórico com Ocorrências incluídas
+        const { data: historyData, error: historyError } = await supabase
+          .from('analysis_history')
+          .select('*, results:occurrences(*)')
+          .order('created_at', { ascending: false });
+
+        if (historyError) throw historyError;
+        if (historyData) {
+          setHistory(historyData.map(h => ({
+            ...h,
+            totalOccurrences: h.total_occurrences,
+            monitorsFound: h.monitors_found
+          })));
         }
-      }
 
-      const savedSchedules = localStorage.getItem('dosp_schedules');
-      if (savedSchedules) setSchedules(JSON.parse(savedSchedules));
-    } catch (e) {
-      console.error('Erro ao carregar dados do localStorage:', e);
-      setMonitors(MOCK_MONITORS);
-    } finally {
-      setIsLoading(false);
-    }
+        // Outros itens secundários
+        const savedSchedules = localStorage.getItem('dosp_schedules');
+        if (savedSchedules) setSchedules(JSON.parse(savedSchedules));
+
+        const savedUser = localStorage.getItem('dosp_user');
+        if (savedUser) setUser(JSON.parse(savedUser));
+
+      } catch (e) {
+        console.error('Erro ao migrar carregamento para Supabase:', e);
+        // Fallback para mock se o banco estiver inacessível no primeiro load
+        if (monitors.length === 0) setMonitors(MOCK_MONITORS);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadInitialData();
   }, []);
 
   const handleLogin = (e: React.FormEvent) => {
@@ -81,22 +87,57 @@ const App: React.FC = () => {
     catch (e) { console.error(`Erro ao salvar '${key}' no localStorage:`, e); }
   };
 
-  const addMonitor = (newM: Omit<ServerMonitor, 'id' | 'createdAt'>) => {
-    const monitor: ServerMonitor = {
-      ...newM,
-      id: crypto.randomUUID(),
-      createdAt: Date.now(),
-      active: true
-    };
-    const updated = [...monitors, monitor];
-    setMonitors(updated);
-    saveToLocalStorage('dosp_monitors', updated);
+  const addMonitor = async (newM: Omit<ServerMonitor, 'id' | 'createdAt'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('monitors')
+        .insert([{
+          name: newM.name,
+          rf: newM.rf,
+          role: newM.role,
+          notes: newM.notes,
+          active: true
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setMonitors(prev => [...prev, data]);
+        addSystemLog('success', 'Monitor adicionado com sucesso ao Supabase', `Servidor: ${data.name}`);
+      }
+    } catch (e) {
+      console.error('Erro ao adicionar monitor:', e);
+      addSystemLog('error', 'Falha ao salvar monitor no Supabase', e instanceof Error ? e.message : String(e));
+      
+      // Fallback para localStorage se quiser manter hibrido ou apenas avisar o usuário
+      const monitor: ServerMonitor = {
+        ...newM,
+        id: crypto.randomUUID(),
+        createdAt: Date.now(),
+        active: true
+      };
+      setMonitors(prev => [...prev, monitor]);
+      saveToLocalStorage('dosp_monitors', [...monitors, monitor]);
+    }
   };
 
-  const deleteMonitor = (id: string) => {
-    const updated = monitors.filter(m => m.id !== id);
-    setMonitors(updated);
-    saveToLocalStorage('dosp_monitors', updated);
+  const deleteMonitor = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('monitors')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      setMonitors(prev => prev.filter(m => m.id !== id));
+      addSystemLog('info', 'Monitor removido do Supabase', `ID: ${id}`);
+    } catch (e) {
+      console.error('Erro ao deletar monitor:', e);
+      // Fallback local
+      setMonitors(monitors.filter(m => m.id !== id));
+      saveToLocalStorage('dosp_monitors', monitors.filter(m => m.id !== id));
+    }
   };
 
   const clearAllMonitors = () => {
@@ -146,23 +187,35 @@ const App: React.FC = () => {
     saveToLocalStorage('dosp_schedules', updated);
   };
 
-  const clearHistory = (ids?: string[]) => {
-    if (!ids || ids.length === 0) {
-      setHistory([]);
-      saveToLocalStorage('dosp_history', []);
-      return;
+  const clearHistory = async (ids?: string[]) => {
+    try {
+      if (!ids || ids.length === 0) {
+        // Limpar tudo
+        const { error } = await supabase.from('analysis_history').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        if (error) throw error;
+        setHistory([]);
+      } else {
+        // Limpar selecionados
+        const { error } = await supabase.from('analysis_history').delete().in('id', ids);
+        if (error) throw error;
+        setHistory(prev => prev.filter(h => !ids.includes(h.id)));
+      }
+      addSystemLog('info', 'Histórico removido do Supabase', ids ? `${ids.length} itens` : 'Todos');
+    } catch (e) {
+      console.error('Erro ao limpar histórico:', e);
     }
-
-    setHistory(prev => {
-      const updated = prev.filter(h => !ids.includes(h.id));
-      saveToLocalStorage('dosp_history', updated);
-      return updated;
-    });
   };
 
-  const updateOccurrenceStatus = (historyId: string, occurrenceId: string, status: 'verified' | 'dismissed' | 'pending') => {
-    setHistory(prev => {
-      const updated = prev.map(h => {
+  const updateOccurrenceStatus = async (historyId: string, occurrenceId: string, status: 'verified' | 'dismissed' | 'pending') => {
+    try {
+      const { error } = await supabase
+        .from('occurrences')
+        .update({ status })
+        .eq('id', occurrenceId);
+
+      if (error) throw error;
+
+      setHistory(prev => prev.map(h => {
         if (h.id === historyId) {
           return {
             ...h,
@@ -172,10 +225,10 @@ const App: React.FC = () => {
           };
         }
         return h;
-      });
-      saveToLocalStorage('dosp_history', updated);
-      return updated;
-    });
+      }));
+    } catch (e) {
+      console.error('Erro ao atualizar status no Supabase:', e);
+    }
   };
 
   const sortHistory = (list: AnalysisHistory[]) => {
@@ -194,28 +247,84 @@ const App: React.FC = () => {
     });
   };
 
-  const handleAnalysisFinish = (date: string, format: DospFormat, results: DospOccurrence[]) => {
-    const uniqueMonitors = new Set(results.map(r => r.monitorId)).size;
-    
-    // Converter YYYY-MM-DD para DD/MM/YYYY
-    const [y, m, d] = date.split('-');
-    const formattedDate = `${d}/${m}/${y}`;
+  const handleAnalysisFinish = async (date: string, format: DospFormat, results: DospOccurrence[]) => {
+    try {
+      const uniqueMonitors = new Set(results.map(r => r.monitorId)).size;
+      const [y, m, d] = date.split('-');
+      const formattedDate = `${d}/${m}/${y}`;
 
-    const newEntry: AnalysisHistory = {
-      id: crypto.randomUUID(),
-      date: formattedDate,
-      format,
-      totalOccurrences: results.length,
-      monitorsFound: uniqueMonitors,
-      timestamp: Date.now(),
-      results: results.map(r => ({ ...r, status: 'pending' }))
-    };
-    
-    setHistory(prev => {
-      const updated = sortHistory([newEntry, ...prev]);
-      saveToLocalStorage('dosp_history', updated);
-      return updated;
-    });
+      // 1. Salvar Cabeçalho do Histórico
+      const { data: historyData, error: historyError } = await supabase
+        .from('analysis_history')
+        .insert([{
+          date: formattedDate,
+          format,
+          total_occurrences: results.length,
+          monitors_found: uniqueMonitors
+        }])
+        .select()
+        .single();
+
+      if (historyError) throw historyError;
+
+      // 2. Salvar Ocorrências Individuais
+      if (results.length > 0 && historyData) {
+        const occurrencesBatch = results.map(r => ({
+          history_id: historyData.id,
+          monitor_id: r.monitorId.startsWith('temp-') ? null : r.monitorId,
+          monitor_name: r.monitorName,
+          monitor_rf: r.monitorRf,
+          title: r.title,
+          content: r.content,
+          page: r.page,
+          url: r.url,
+          confidence: r.confidence,
+          match_type: r.matchType,
+          status: 'pending'
+        }));
+
+        const { error: occError } = await supabase
+          .from('occurrences')
+          .insert(occurrencesBatch);
+
+        if (occError) throw occError;
+      }
+
+      addSystemLog('success', 'Análise salva no Supabase', `${results.length} ocorrências persistidas.`);
+      
+      // Recarregar histórico para refletir mudanças
+      const { data: updatedHistory, error: loadError } = await supabase
+        .from('analysis_history')
+        .select('*, results:occurrences(*)')
+        .order('created_at', { ascending: false });
+
+      if (!loadError && updatedHistory) {
+        setHistory(updatedHistory.map(h => ({
+          ...h,
+          totalOccurrences: h.total_occurrences,
+          monitorsFound: h.monitors_found
+        })));
+      }
+
+    } catch (e) {
+      console.error('Erro ao salvar análise no Supabase:', e);
+      addSystemLog('error', 'Falha ao salvar análise na nuvem', e instanceof Error ? e.message : String(e));
+      
+      // Fallback local para não perder o trabalho atual
+      const uniqueMonitors = new Set(results.map(r => r.monitorId)).size;
+      const [y, m, d] = date.split('-');
+      const formattedDate = `${d}/${m}/${y}`;
+      const newEntry: AnalysisHistory = {
+        id: crypto.randomUUID(),
+        date: formattedDate,
+        format,
+        totalOccurrences: results.length,
+        monitorsFound: uniqueMonitors,
+        timestamp: Date.now(),
+        results: results.map(r => ({ ...r, status: 'pending' }))
+      };
+      setHistory(prev => sortHistory([newEntry, ...prev]));
+    }
     setActiveTab('history');
   };
 
