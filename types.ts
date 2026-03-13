@@ -36,6 +36,7 @@ export interface DospOccurrence {
   url: string;
   confidence: 'high' | 'medium' | 'low';
   matchType: 'exact' | 'flexible' | 'proximity';
+  status?: 'verified' | 'dismissed' | 'pending';
 }
 
 export interface AnalysisHistory {

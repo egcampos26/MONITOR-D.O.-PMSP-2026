@@ -8,30 +8,14 @@ import HighlightText from './HighlightText';
 interface HistoryViewProps {
   history: AnalysisHistory[];
   onClearHistory: (ids?: string[]) => void;
+  onUpdateOccurrence: (historyId: string, occurrenceId: string, status: 'verified' | 'dismissed' | 'pending') => void;
 }
 
-const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory }) => {
+const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory, onUpdateOccurrence }) => {
   const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDeletionMode, setIsDeletionMode] = useState(false);
   const [isConfirmingClear, setIsConfirmingClear] = useState(false);
-
-  const handleExportXlsx = (entry: AnalysisHistory) => {
-    const rows = entry.results.map(occ => ({
-      'Nome do Servidor': occ.monitorName,
-      'RF': occ.monitorRf,
-      'Título da Matéria': occ.title,
-      'Conteúdo': occ.content,
-      'Página': occ.page || 'N/D',
-      'Confiança': occ.confidence,
-      'Tipo de Match': occ.matchType,
-      'Link': occ.url,
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Ocorrências');
-    XLSX.writeFile(wb, `DOSP_${entry.date}.xlsx`);
-  };
 
   const toggleSelectAll = () => {
     if (selectedIds.size === history.length) {
@@ -62,8 +46,6 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory }) =>
     }
 
     if (selectedIds.size === 0) {
-      // Se não selecionou nada, apenas sai do modo ou limpa tudo se clicar duas vezes?
-      // Vamos seguir a regra de confirmação de clique duplo se houver seleção.
       setIsDeletionMode(false);
       return;
     }
@@ -78,6 +60,24 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory }) =>
     setSelectedIds(new Set());
     setIsDeletionMode(false);
     setIsConfirmingClear(false);
+  };
+
+  const handleExportXlsx = (entry: AnalysisHistory) => {
+    const rows = entry.results.map(occ => ({
+      'Nome do Servidor': occ.monitorName,
+      'RF': occ.monitorRf,
+      'Título da Matéria': occ.title,
+      'Conteúdo': occ.content,
+      'Página': occ.page || 'N/D',
+      'Confiança': occ.confidence,
+      'Tipo de Match': occ.matchType,
+      'Link': occ.url,
+      'Status': occ.status === 'verified' ? 'Verificado' : occ.status === 'dismissed' ? 'Ignorado' : 'Pendente'
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Ocorrências');
+    XLSX.writeFile(wb, `DOSP_${entry.date}.xlsx`);
   };
 
   return (
@@ -127,16 +127,9 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory }) =>
         <table className="w-full text-left border-collapse">
           <thead className="bg-gray-50/80 backdrop-blur-sm border-b border-gray-100 text-[11px] text-slate-500 uppercase font-black tracking-widest">
             <tr>
-              {isDeletionMode && (
-                <th className="px-6 py-4 w-10">
-                  <input 
-                    type="checkbox" 
-                    checked={selectedIds.size === history.length && history.length > 0}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
-                  />
-                </th>
-              )}
+              {isDeletionMode && <th className="px-6 py-4 w-10">
+                <input type="checkbox" checked={selectedIds.size === history.length && history.length > 0} onChange={toggleSelectAll} className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer" />
+              </th>}
               <th className="px-6 py-4">Data da Edição</th>
               <th className="px-6 py-4">Servidores</th>
               <th className="px-6 py-4">Ocorrências</th>
@@ -211,13 +204,18 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory }) =>
                     </td>
                   </tr>
                   
-                  {/* Detalhes Expandidos (Accordion Interno) */}
                   {isExpanded && (
                     <tr>
                       <td colSpan={isDeletionMode ? 6 : 5} className="p-0 border-b border-gray-100 bg-slate-50/50">
                         <div className="px-8 py-4 animate-in slide-in-from-top-4 duration-300">
                           <div className="space-y-3">
-                            {h.results.map((occ) => <OccurrenceAccordionItem key={occ.id} occ={occ} />)}
+                            {h.results.map((occ) => (
+                              <OccurrenceAccordionItem 
+                                key={occ.id} 
+                                occ={occ} 
+                                onUpdateStatus={(status) => onUpdateOccurrence(h.id, occ.id, status)}
+                              />
+                            ))}
                             {h.totalOccurrences === 0 && (
                               <div className="text-center py-8 bg-white rounded-xl border border-dashed border-slate-200 text-slate-400 text-sm">
                                 Nenhuma ocorrência relevante foi encontrada nesta análise.
@@ -231,6 +229,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory }) =>
                 </React.Fragment>
               );
             })}
+            {/* ... (empty state remains same) */}
             {history.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-6 py-20 text-center">
@@ -252,45 +251,89 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory }) =>
   );
 };
 
-const OccurrenceAccordionItem: React.FC<{ occ: any }> = ({ occ }) => {
+const OccurrenceAccordionItem: React.FC<{ occ: any, onUpdateStatus: (status: 'verified' | 'dismissed' | 'pending') => void }> = ({ occ, onUpdateStatus }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const isSearchLink = occ.url.includes('ep_busca_materia');
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm hover:border-blue-200 transition-all overflow-hidden">
+    <div className={`bg-white rounded-xl border shadow-sm transition-all overflow-hidden ${
+      occ.status === 'verified' ? 'border-green-200 ring-1 ring-green-100' : 
+      occ.status === 'dismissed' ? 'border-red-100 opacity-60 grayscale-[0.5]' : 
+      'border-gray-100 hover:border-blue-200'
+    }`}>
       <div 
-        className="p-4 cursor-pointer flex items-start justify-between bg-white hover:bg-gray-50/50"
+        className={`p-4 cursor-pointer flex items-start justify-between ${occ.status === 'verified' ? 'bg-green-50/30' : 'bg-white hover:bg-gray-50/50'}`}
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="flex items-start gap-4">
+        <div className="flex items-start gap-4 flex-1">
           <div className={`mt-0.5 p-1 rounded transition-transform duration-300 ${isExpanded ? 'rotate-180 text-blue-600 bg-blue-50' : 'text-slate-300'}`}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </div>
-          <div>
+          <div className="flex-1">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="text-xs font-black text-slate-900 uppercase tracking-tighter">{occ.monitorName}</span>
               <span className="text-[10px] text-slate-400 font-mono">RF: {occ.monitorRf}</span>
+              {occ.status === 'verified' && (
+                <span className="text-[9px] bg-green-600 text-white px-1.5 py-0.5 rounded-full font-bold animate-in zoom-in duration-300">VERIFICADO</span>
+              )}
+              {occ.status === 'dismissed' && (
+                <span className="text-[9px] bg-slate-500 text-white px-1.5 py-0.5 rounded-full font-bold">DESCARTADO</span>
+              )}
             </div>
-            <h4 className="font-bold text-blue-600 text-sm line-clamp-1">{occ.title}</h4>
+            <h4 className={`font-bold text-sm line-clamp-1 ${occ.status === 'verified' ? 'text-green-800' : 'text-blue-600'}`}>{occ.title}</h4>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          <span className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-tighter ${
-            occ.confidence === 'high' ? 'bg-green-100 text-green-700' : 
-            occ.confidence === 'medium' ? 'bg-amber-100 text-amber-700' : 
-            'bg-red-100 text-red-700'
-          }`}>
-            {occ.confidence === 'high' ? 'Alta' : occ.confidence === 'medium' ? 'Média' : 'Baixa'}
-          </span>
-          <span className="text-[10px] text-slate-400 font-bold">PG {occ.page}</span>
+        
+        <div className="flex items-center gap-3 shrink-0 ml-4">
+          <div className="flex items-center bg-slate-50 rounded-lg p-1 border border-slate-100 gap-1">
+            <button 
+              onClick={(e) => { e.stopPropagation(); onUpdateStatus(occ.status === 'verified' ? 'pending' : 'verified'); }}
+              title={occ.status === 'verified' ? "Desmarcar verificado" : "Marcar como verificado"}
+              className={`p-1.5 rounded-md transition-all ${
+                occ.status === 'verified' 
+                  ? 'bg-green-600 text-white shadow-sm' 
+                  : 'text-slate-400 hover:text-green-600 hover:bg-green-50'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); onUpdateStatus(occ.status === 'dismissed' ? 'pending' : 'dismissed'); }}
+              title={occ.status === 'dismissed' ? "Remover do descarte" : "Indicar que não corresponde"}
+              className={`p-1.5 rounded-md transition-all ${
+                occ.status === 'dismissed' 
+                  ? 'bg-red-600 text-white shadow-sm' 
+                  : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="flex flex-col items-end gap-1 shrink-0 min-w-[60px]">
+            <span className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-tighter ${
+              occ.confidence === 'high' ? 'bg-green-100 text-green-700' : 
+              occ.confidence === 'medium' ? 'bg-amber-100 text-amber-700' : 
+              'bg-red-100 text-red-700'
+            }`}>
+              {occ.confidence === 'high' ? 'Alta' : occ.confidence === 'medium' ? 'Média' : 'Baixa'}
+            </span>
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none">PG {occ.page}</span>
+          </div>
         </div>
       </div>
 
       {isExpanded && (
         <div className="px-4 pb-4 pt-0 animate-in fade-in slide-in-from-top-2 duration-300">
-          <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 mb-3 italic text-slate-600 text-[13px] leading-relaxed whitespace-pre-wrap border-l-4 border-l-blue-400">
+          <div className={`p-3 rounded-lg border mb-3 italic text-[13px] leading-relaxed whitespace-pre-wrap border-l-4 ${
+            occ.status === 'verified' ? 'bg-green-50/50 border-green-100 border-l-green-500 text-green-800' : 'bg-slate-50 border-slate-100 border-l-blue-400 text-slate-600'
+          }`}>
             "<HighlightText text={occ.content} terms={[occ.monitorName, occ.monitorRf]} />"
           </div>
           <div className="flex items-center justify-between">

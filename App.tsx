@@ -160,6 +160,24 @@ const App: React.FC = () => {
     });
   };
 
+  const updateOccurrenceStatus = (historyId: string, occurrenceId: string, status: 'verified' | 'dismissed' | 'pending') => {
+    setHistory(prev => {
+      const updated = prev.map(h => {
+        if (h.id === historyId) {
+          return {
+            ...h,
+            results: h.results.map(occ => 
+              occ.id === occurrenceId ? { ...occ, status } : occ
+            )
+          };
+        }
+        return h;
+      });
+      saveToLocalStorage('dosp_history', updated);
+      return updated;
+    });
+  };
+
   const sortHistory = (list: AnalysisHistory[]) => {
     return [...list].sort((a, b) => {
       // Tentar split por / (novo) ou - (velho)
@@ -190,7 +208,7 @@ const App: React.FC = () => {
       totalOccurrences: results.length,
       monitorsFound: uniqueMonitors,
       timestamp: Date.now(),
-      results
+      results: results.map(r => ({ ...r, status: 'pending' }))
     };
     
     setHistory(prev => {
@@ -291,7 +309,11 @@ const App: React.FC = () => {
         />
       )}
       {activeTab === 'history' && (
-        <HistoryView history={history} onClearHistory={clearHistory} />
+        <HistoryView 
+          history={history} 
+          onClearHistory={clearHistory} 
+          onUpdateOccurrence={updateOccurrenceStatus} 
+        />
       )}
       {activeTab === 'logs' && (
         <LogView />
