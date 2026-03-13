@@ -1,36 +1,20 @@
+import { supabase } from './supabaseClient';
+
 export type LogSeverity = 'info' | 'success' | 'warning' | 'error';
 
 export interface SystemLog {
   id: string;
-  timestamp: number;
+  timestamp: string;
   severity: LogSeverity;
   message: string;
   details?: string;
 }
 
-const LOG_STORAGE_KEY = 'dosp_syslogs';
-
 /**
- * Retorna todos os logs ordenados do mais recente para o mais antigo.
+ * Adiciona um novo registro ao log do sistema no Supabase
  */
-export const getLogs = (): SystemLog[] => {
+export const addSystemLog = async (severity: LogSeverity, message: string, details?: any) => {
   try {
-    const raw = localStorage.getItem(LOG_STORAGE_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch (e) {
-    console.error('Falha ao ler logs', e);
-    return [];
-  }
-};
-
-/**
- * Adiciona um novo registro ao log do sistema
- */
-export const addSystemLog = (severity: LogSeverity, message: string, details?: any) => {
-  try {
-    const logs = getLogs();
-    
     let detailsString = undefined;
     if (details) {
       if (details instanceof Error) {
@@ -42,22 +26,21 @@ export const addSystemLog = (severity: LogSeverity, message: string, details?: a
       }
     }
 
-    const newLog: SystemLog = {
-      id: crypto.randomUUID(),
-      timestamp: Date.now(),
-      severity,
-      message,
-      details: detailsString
-    };
+    // Persiste no Supabase
+    const { error } = await supabase
+      .from('system_logs')
+      .insert([{
+        type: severity,
+        message: message,
+        detail: detailsString ? { content: detailsString } : null
+      }]);
 
-    // Mantém apenas os últimos 500 logs para não estourar o localStorage
-    const newLogs = [newLog, ...logs].slice(0, 500);
-    localStorage.setItem(LOG_STORAGE_KEY, JSON.stringify(newLogs));
-    
-    // Dispara um evento customizado para que a UI (App.tsx) possa atualizar em tempo real
+    if (error) console.error('Erro ao salvar log no Supabase:', error);
+
+    // Dispara evento para atualização da UI local
     window.dispatchEvent(new CustomEvent('dosp_syslog_updated'));
     
-    // Também espelha no console do browser para debugging nativo
+    // Console mirroring
     if (severity === 'error') console.error(`[DOSP Monitor Log]: ${message}`, details);
     else if (severity === 'warning') console.warn(`[DOSP Monitor Log]: ${message}`, details);
     else console.log(`[DOSP Monitor Log]: ${message}`);
@@ -68,13 +51,18 @@ export const addSystemLog = (severity: LogSeverity, message: string, details?: a
 };
 
 /**
- * Limpa o histórico de logs
+ * Limpa os logs no Supabase
  */
-export const clearSystemLogs = () => {
+export const clearSystemLogs = async () => {
   try {
-    localStorage.removeItem(LOG_STORAGE_KEY);
+    const { error } = await supabase
+      .from('system_logs')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+    
+    if (error) throw error;
     window.dispatchEvent(new CustomEvent('dosp_syslog_updated'));
   } catch (e) {
-    console.error('Falha ao limpar logs', e);
+    console.error('Falha ao limpar logs no Supabase', e);
   }
 };

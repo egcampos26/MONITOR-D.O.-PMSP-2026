@@ -164,27 +164,62 @@ const App: React.FC = () => {
   };
 
   // Scheduling Actions
-  const addSchedule = (newS: Omit<ScheduledAnalysis, 'id' | 'createdAt'>) => {
-    const schedule: ScheduledAnalysis = {
-      ...newS,
-      id: crypto.randomUUID(),
-      createdAt: Date.now()
-    };
-    const updated = [...schedules, schedule];
-    setSchedules(updated);
-    saveToLocalStorage('dosp_schedules', updated);
+  const addSchedule = async (newS: Omit<ScheduledAnalysis, 'id' | 'createdAt'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('scheduled_analyses')
+        .insert([{
+          name: newS.name,
+          frequency: newS.frequency,
+          time: newS.time,
+          active: true,
+          format: newS.format || 'JSON'
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setSchedules(prev => [data, ...prev]);
+        addSystemLog('success', 'Agendamento criado no Supabase', `Nome: ${newS.name}`);
+      }
+    } catch (e) {
+      console.error('Erro ao adicionar agendamento:', e);
+    }
   };
 
-  const deleteSchedule = (id: string) => {
-    const updated = schedules.filter(s => s.id !== id);
-    setSchedules(updated);
-    saveToLocalStorage('dosp_schedules', updated);
+  const deleteSchedule = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('scheduled_analyses')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      setSchedules(prev => prev.filter(s => s.id !== id));
+      addSystemLog('info', 'Agendamento removido do Supabase', `ID: ${id}`);
+    } catch (e) {
+      console.error('Erro ao deletar agendamento:', e);
+    }
   };
 
-  const toggleSchedule = (id: string) => {
-    const updated = schedules.map(s => s.id === id ? { ...s, active: !s.active } : s);
-    setSchedules(updated);
-    saveToLocalStorage('dosp_schedules', updated);
+  const toggleSchedule = async (id: string) => {
+    const schedule = schedules.find(s => s.id === id);
+    if (!schedule) return;
+
+    try {
+      const { error } = await supabase
+        .from('scheduled_analyses')
+        .update({ active: !schedule.active })
+        .eq('id', id);
+
+      if (error) throw error;
+      setSchedules(prev => prev.map(s => 
+        s.id === id ? { ...s, active: !s.active } : s
+      ));
+    } catch (e) {
+      console.error('Erro ao toggle agendamento:', e);
+    }
   };
 
   const clearHistory = async (ids?: string[]) => {

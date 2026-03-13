@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { getLogs, clearSystemLogs, SystemLog } from '../services/logService';
+import { supabase } from '../services/supabaseClient';
+import { clearSystemLogs, SystemLog } from '../services/logService';
 
 const severityColors = {
   info: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -33,9 +34,32 @@ const severityIcons = {
 
 const LogView: React.FC = () => {
   const [logs, setLogs] = useState<SystemLog[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const loadLogs = () => {
-    setLogs(getLogs());
+  const loadLogs = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('system_logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      if (data) {
+        setLogs(data.map(l => ({
+          id: l.id,
+          timestamp: l.timestamp,
+          severity: l.type as any,
+          message: l.message,
+          details: l.detail?.content || (typeof l.detail === 'string' ? l.detail : JSON.stringify(l.detail))
+        })));
+      }
+    } catch (e) {
+      console.error('Erro ao carregar logs do Supabase:', e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -46,8 +70,9 @@ const LogView: React.FC = () => {
     return () => window.removeEventListener('dosp_syslog_updated', loadLogs);
   }, []);
 
-  const handleClear = () => {
-    clearSystemLogs();
+  const handleClear = async () => {
+    await clearSystemLogs();
+    setLogs([]);
   };
 
   return (

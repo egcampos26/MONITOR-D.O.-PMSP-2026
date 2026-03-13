@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/pmsp/:path*",
+      "destination": "https://gateway.apilib.prefeitura.sp.gov.br/:path*"
+    },
+    {
+      "source": "/api/dosp-portal/:path*",
+      "destination": "https://diariooficial.prefeitura.sp.gov.br/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
