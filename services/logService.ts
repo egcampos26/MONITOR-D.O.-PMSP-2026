@@ -41,9 +41,9 @@ export const addSystemLog = async (severity: LogSeverity, message: string, detai
     window.dispatchEvent(new CustomEvent('dosp_syslog_updated'));
     
     // Console mirroring
-    if (severity === 'error') console.error(`[DOSP Monitor Log]: ${message}`, details);
-    else if (severity === 'warning') console.warn(`[DOSP Monitor Log]: ${message}`, details);
-    else console.log(`[DOSP Monitor Log]: ${message}`);
+    if (severity === 'error') console.error(`[D.O. PMSP Monitor Log]: ${message}`, details);
+    else if (severity === 'warning') console.warn(`[D.O. PMSP Monitor Log]: ${message}`, details);
+    else console.log(`[D.O. PMSP Monitor Log]: ${message}`);
     
   } catch (e) {
     console.error('Falha crítica ao gravar log do sistema', e);

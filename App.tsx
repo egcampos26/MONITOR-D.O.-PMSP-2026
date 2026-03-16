@@ -23,62 +23,117 @@ const App: React.FC = () => {
 
   // Simulation of auth state check
   useEffect(() => {
-    const loadInitialData = async () => {
-      setIsLoading(true);
-      try {
-        // 1. Carregar Monitores
-        const { data: monitorsData, error: monitorsError } = await supabase
-          .from('monitors')
-          .select('*')
-          .order('name');
-        
-        if (monitorsError) throw monitorsError;
-        setMonitors(monitorsData || []);
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        setUser({
+          email: session.user.email || '',
+          name: session.user.user_metadata?.name || 'Usuário'
+        });
+        loadInitialData();
+      } else {
+        setUser(null);
+        setMonitors([]);
+        setHistory([]);
+        setSchedules([]);
+      }
+      setIsLoading(false);
+    });
 
-        // 2. Carregar Histórico com Ocorrências incluídas
-        const { data: historyData, error: historyError } = await supabase
-          .from('analysis_history')
-          .select('*, results:occurrences(*)')
-          .order('created_at', { ascending: false });
-
-        if (historyError) throw historyError;
-        if (historyData) {
-          setHistory(historyData.map(h => ({
-            ...h,
-            totalOccurrences: h.total_occurrences,
-            monitorsFound: h.monitors_found
-          })));
-        }
-
-        // Outros itens secundários
-        const savedSchedules = localStorage.getItem('dosp_schedules');
-        if (savedSchedules) setSchedules(JSON.parse(savedSchedules));
-
-        const savedUser = localStorage.getItem('dosp_user');
-        if (savedUser) setUser(JSON.parse(savedUser));
-
-      } catch (e) {
-        console.error('Erro ao migrar carregamento para Supabase:', e);
-        // Fallback para mock se o banco estiver inacessível no primeiro load
-        if (monitors.length === 0) setMonitors(MOCK_MONITORS);
-      } finally {
+    // Initial session check
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser({
+          email: session.user.email || '',
+          name: session.user.user_metadata?.name || 'Usuário'
+        });
+        loadInitialData();
+      } else {
         setIsLoading(false);
       }
     };
+    checkSession();
 
-    loadInitialData();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    const mockUser = { email: 'contato@pmsp.gov.br', name: 'Gestor DOSP' };
-    setUser(mockUser);
-    try { localStorage.setItem('dosp_user', JSON.stringify(mockUser)); } catch (e) { console.error(e); }
+  const loadInitialData = async () => {
+    setIsLoading(true);
+    try {
+      // 1. Carregar Monitores
+      const { data: monitorsData, error: monitorsError } = await supabase
+        .from('monitors')
+        .select('*')
+        .order('name');
+      
+      if (monitorsError) throw monitorsError;
+      setMonitors(monitorsData || []);
+
+      // 2. Carregar Histórico com Ocorrências incluídas
+      const { data: historyData, error: historyError } = await supabase
+        .from('analysis_history')
+        .select('*, results:occurrences(*)')
+        .order('created_at', { ascending: false });
+
+      if (historyError) throw historyError;
+      if (historyData) {
+        setHistory(historyData.map(h => ({
+          ...h,
+          totalOccurrences: h.total_occurrences,
+          monitorsFound: h.monitors_found
+        })));
+      }
+
+      // Carregar Agendamentos do Supabase (agora com RLS)
+      const { data: scheduleData, error: scheduleError } = await supabase
+        .from('scheduled_analyses')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (!scheduleError && scheduleData) {
+        setSchedules(scheduleData);
+      }
+
+    } catch (e) {
+      console.error('Erro ao carregar dados do Supabase:', e);
+      // Fallback para mock apenas se for erro de conexão e não houver dados
+      if (monitors.length === 0) setMonitors(MOCK_MONITORS);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleLogout = () => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = (e.target as any)[0].value;
+    const password = (e.target as any)[1].value;
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        alert('Falha no login: ' + error.message);
+        throw error;
+      }
+      addSystemLog('success', 'Usuário logado com sucesso', email);
+    } catch (e) {
+      console.error(e);
+      addSystemLog('error', 'Falha no login', String(e));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    try { localStorage.removeItem('dosp_user'); } catch (e) { console.error(e); }
   };
 
   // Monitor Actions
@@ -104,21 +159,12 @@ const App: React.FC = () => {
       if (error) throw error;
       if (data) {
         setMonitors(prev => [...prev, data]);
-        addSystemLog('success', 'Monitor adicionado com sucesso ao Supabase', `Servidor: ${data.name}`);
+        addSystemLog('success', 'Monitor adicionado com sucesso', `Servidor: ${data.name}`);
       }
     } catch (e) {
       console.error('Erro ao adicionar monitor:', e);
-      addSystemLog('error', 'Falha ao salvar monitor no Supabase', e instanceof Error ? e.message : String(e));
-      
-      // Fallback para localStorage se quiser manter hibrido ou apenas avisar o usuário
-      const monitor: ServerMonitor = {
-        ...newM,
-        id: crypto.randomUUID(),
-        createdAt: Date.now(),
-        active: true
-      };
-      setMonitors(prev => [...prev, monitor]);
-      saveToLocalStorage('dosp_monitors', [...monitors, monitor]);
+      addSystemLog('error', 'Falha ao salvar monitor no banco de dados', e instanceof Error ? e.message : String(e));
+      alert('Erro ao salvar monitor. Verifique se você está logado.');
     }
   };
 
@@ -373,7 +419,7 @@ const App: React.FC = () => {
             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <span className="font-bold text-2xl tracking-tight">DOSP Monitor</span>
+            <span className="font-bold text-2xl tracking-tight">D.O. PMSP Monitor</span>
           </div>
           <div className="max-w-md">
             <h1 className="text-5xl font-extrabold mb-6 leading-tight">Monitoramento Inteligente do Diário Oficial.</h1>
