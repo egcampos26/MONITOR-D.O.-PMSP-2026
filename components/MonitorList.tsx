@@ -63,17 +63,21 @@ const MonitorList: React.FC<MonitorListProps> = ({ monitors, onAdd, onDelete, on
 
         const headers = data[0].map(h => String(h || ''));
         
-        // Mapeamento inteligente de colunas
+        // Mapeamento extra flexível de colunas
         const colMap = {
-          name: findHeaderIndex(headers, ['nome', 'servidor', 'completo', 'name']),
-          rf: findHeaderIndex(headers, ['rf', 'registro', 'funcional', 'matricula']),
-          role: findHeaderIndex(headers, ['cargo', 'funcao', 'função', 'role', 'atribuicao']),
-          notes: findHeaderIndex(headers, ['obs', 'observacao', 'observação', 'notas', 'notes'])
+          name: findHeaderIndex(headers, ['nome', 'servidor', 'completo', 'name', 'serv', 'funcionario', 'funcionário']),
+          rf: findHeaderIndex(headers, ['rf', 'registro', 'funcional', 'matricula', 'matrícula', 'reg']),
+          role: findHeaderIndex(headers, ['cargo', 'funcao', 'função', 'role', 'atribuicao', 'atribuição', 'posicao', 'posição']),
+          notes: findHeaderIndex(headers, ['obs', 'observacao', 'observação', 'notas', 'notes', 'comentário', 'memo'])
         };
+
+        const identifiedCols = Object.entries(colMap)
+          .filter(([_, idx]) => idx !== -1)
+          .map(([key, _]) => key === 'name' ? 'Nome' : key === 'rf' ? 'RF' : key === 'role' ? 'Cargo' : 'Obs');
 
         // Validação mínima: Precisa ter pelo menos Nome ou RF
         if (colMap.name === -1 && colMap.rf === -1) {
-          alert("Não foi possível identificar as colunas de 'Nome' ou 'RF'. Certifique-se de que a primeira linha contém os nomes das colunas.");
+          alert(`Não foi possível identificar as colunas obrigatórias. \n\nColunas encontradas no seu Excel: ${headers.join(', ')}\n\nO sistema busca por: Nome, RF ou Registro.`);
           return;
         }
 
@@ -102,6 +106,7 @@ const MonitorList: React.FC<MonitorListProps> = ({ monitors, onAdd, onDelete, on
         }
 
         if (imported.length > 0) {
+          addSystemLog('info', 'Excel processado', `${imported.length} linhas encontradas. Colunas: ${identifiedCols.join(', ')}`);
           onImport(imported);
         } else {
           alert("Nenhum dado válido encontrado nas linhas abaixo do cabeçalho.");

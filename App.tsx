@@ -104,9 +104,10 @@ const App: React.FC = () => {
       
       // Fallback para mock apenas se for erro de conexão e não houver dados
       if (monitors.length === 0) {
-        const savedMonitors = loadFromLocalStorage('dosp_monitors', []);
-        if (savedMonitors.length > 0) {
-          setMonitors(savedMonitors);
+        // Usa o helper que já existe agora
+        const saved = loadFromLocalStorage<ServerMonitor[]>('dosp_monitors', []);
+        if (saved.length > 0) {
+          setMonitors(saved);
         } else {
           setMonitors(MOCK_MONITORS);
         }
@@ -224,8 +225,8 @@ const App: React.FC = () => {
 
       addSystemLog('info', 'Iniciando importação...', `Processando ${imported.length} registros.`);
 
-      // Removendo user_id explícito para deixar o default (auth.uid()) do Supabase agir,
-      // assim como funciona no addMonitor manual.
+      // Inserção em lote (Bulk Insert)
+      // Incluindo explicitamente o user_id para garantir consistência em lote
       const { data, error } = await supabase
         .from('monitors')
         .insert(imported.map(m => ({
@@ -233,7 +234,8 @@ const App: React.FC = () => {
           rf: m.rf,
           role: m.role,
           notes: m.notes,
-          active: true
+          active: true,
+          user_id: session.user.id // Explicitamente setado como no addMonitor manual
         })))
         .select();
 
@@ -243,16 +245,17 @@ const App: React.FC = () => {
       }
 
       if (data && data.length > 0) {
-        // Atualizar estado local com os novos dados vindos do banco
         setMonitors(prev => {
-          // Evitar duplicatas visuais se loadInitialData rodar em paralelo
           const existingIds = new Set(prev.map(p => p.id));
           const onlyNew = data.filter(d => !existingIds.has(d.id));
-          return [...prev, ...onlyNew];
+          const updated = [...prev, ...onlyNew];
+          // Sincroniza localmente IMEDIATAMENTE para evitar que o re-fetch limpe
+          saveToLocalStorage('dosp_monitors', updated);
+          return updated;
         });
         
-        addSystemLog('success', 'Importação concluída', `${data.length} servidores salvos.`);
-        alert(`${data.length} servidores importados e salvos com sucesso!`);
+        addSystemLog('success', 'Importação concluída e salva no banco', `${data.length} servidores.`);
+        alert(`${data.length} servidores importados e salvos com sucesso no seu banco de dados!`);
       }
     } catch (e) {
       console.error('Erro fatal:', e);
