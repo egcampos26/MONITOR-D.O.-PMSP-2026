@@ -43,20 +43,25 @@ const MonitorList: React.FC<MonitorListProps> = ({ monitors, onAdd, onDelete, on
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    // Alerta direto para confirmar versão
+    window.alert(`XLSX v0.5.2: Lendo ${file.name}...`);
+    console.log('XLSX DEBUG: Iniciando leitura...');
     alert(`DEBUG: Arquivo selecionado: ${file.name}. Iniciando leitura...`);
 
-    setIsImporting(true);
     const reader = new FileReader();
 
     reader.onload = (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const dataBuffer = evt.target?.result;
+        console.log('XLSX DEBUG: Reader finalizado.');
+        const wb = XLSX.read(dataBuffer, { type: 'array' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         
         // Obter dados como matriz (rows e columns)
         const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+        window.alert(`XLSX DEBUG: ${data.length} linhas lidas.`);
         
         if (data.length < 2) {
           alert("O arquivo parece estar vazio ou não contém cabeçalhos.");
@@ -108,7 +113,7 @@ const MonitorList: React.FC<MonitorListProps> = ({ monitors, onAdd, onDelete, on
         }
 
         if (imported.length > 0) {
-          alert(`DEBUG: ${imported.length} servidores identificados no Excel. Chamando onImport...`);
+          window.alert(`XLSX DEBUG: Enviando ${imported.length} itens para o App.tsx`);
           onImport(imported);
         } else {
           alert("Nenhum dado válido encontrado nas linhas abaixo do cabeçalho.");
@@ -122,7 +127,7 @@ const MonitorList: React.FC<MonitorListProps> = ({ monitors, onAdd, onDelete, on
       }
     };
 
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const handleClearAll = () => {

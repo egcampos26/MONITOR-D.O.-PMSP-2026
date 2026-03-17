@@ -1,5 +1,5 @@
-
 import React from 'react';
+import { supabase } from '../services/supabaseClient';
 import { AnalysisHistory, ServerMonitor } from '../types';
 import HighlightText from './HighlightText';
 
@@ -20,8 +20,35 @@ const Dashboard: React.FC<DashboardProps> = ({ monitors, history }) => {
           <h2 className="text-2xl font-bold text-slate-900">Dashboard</h2>
           <p className="text-slate-500">Bem-vindo ao painel de controle funcional.</p>
         </div>
-        <div className="text-sm text-slate-500">
-          Última atualização: {new Date().toLocaleDateString('pt-BR')}
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={async () => {
+              const testId = `test-${Date.now()}`;
+              window.alert('Iniciando teste de conexão...');
+              try {
+                const { data, error } = await supabase
+                  .from('system_logs')
+                  .insert([{ 
+                    type: 'info', 
+                    message: 'Teste de Conexão Manual', 
+                    detail: { content: `ID de Teste: ${testId}` } 
+                  }])
+                  .select();
+                
+                if (error) throw error;
+                window.alert('SUCESSO: Conexão com Supabase OK!');
+              } catch (err) {
+                console.error('Falha no teste:', err);
+                window.alert('FALHA DE CONEXÃO: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+              }
+            }}
+            className="text-xs bg-slate-800 text-white px-3 py-1.5 rounded-lg hover:bg-slate-700 transition-colors uppercase font-bold tracking-wider"
+          >
+            Testar Conexão com Banco
+          </button>
+          <div className="text-sm text-slate-500">
+            Última atualização: {new Date().toLocaleDateString('pt-BR')}
+          </div>
         </div>
       </div>
 
