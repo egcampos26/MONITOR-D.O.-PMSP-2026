@@ -54,14 +54,12 @@ const MonitorList: React.FC<MonitorListProps> = ({ monitors, onAdd, onDelete, on
     reader.onload = (evt) => {
       try {
         const dataBuffer = evt.target?.result;
-        console.log('XLSX DEBUG: Reader finalizado.');
         const wb = XLSX.read(dataBuffer, { type: 'array' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         
         // Obter dados como matriz (rows e columns)
         const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-        window.alert(`XLSX DEBUG: ${data.length} linhas lidas.`);
         
         if (data.length < 2) {
           alert("O arquivo parece estar vazio ou não contém cabeçalhos.");
@@ -113,7 +111,6 @@ const MonitorList: React.FC<MonitorListProps> = ({ monitors, onAdd, onDelete, on
         }
 
         if (imported.length > 0) {
-          window.alert(`XLSX DEBUG: Enviando ${imported.length} itens para o App.tsx`);
           onImport(imported);
         } else {
           alert("Nenhum dado válido encontrado nas linhas abaixo do cabeçalho.");

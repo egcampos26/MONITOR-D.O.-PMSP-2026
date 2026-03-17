@@ -82,8 +82,21 @@ const App: React.FC = () => {
       if (historyData) {
         setHistory(historyData.map(h => ({
           ...h,
-          totalOccurrences: h.total_occurrences,
-          monitorsFound: h.monitors_found
+          totalOccurrences: h.total_comments || h.total_occurrences,
+          monitorsFound: h.monitors_found,
+          results: (h.results || []).map((r: any) => ({
+            id: r.id,
+            monitorId: r.monitor_id,
+            monitorName: r.monitor_name,
+            monitorRf: r.monitor_rf,
+            title: r.title,
+            content: r.content,
+            page: r.page,
+            url: r.url,
+            confidence: r.confidence,
+            matchType: r.match_type,
+            status: r.status
+          }))
         })));
       }
 
@@ -219,7 +232,6 @@ const App: React.FC = () => {
   };
 
   const importMonitors = async (imported: Omit<ServerMonitor, 'id' | 'createdAt'>[]) => {
-    alert(`DEBUG: importMonitors iniciada no App.tsx com ${imported.length} registros.`);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sessão expirada. Faça login no banco de dados!');
@@ -250,7 +262,6 @@ const App: React.FC = () => {
       }
 
       const rowsInserted = data?.length || 0;
-      console.log('DEBUG: Linhas retornadas pelo select:', rowsInserted);
 
       if (rowsInserted > 0) {
         setMonitors(prev => {
@@ -262,17 +273,14 @@ const App: React.FC = () => {
         });
         
         addSystemLog('success', 'Banco Corretamente Atualizado', `${rowsInserted} servidores salvos permanentemente.`);
-        alert(`${rowsInserted} servidores foram gravados com sucesso no banco de dados.`);
       } else {
         const warningMsg = 'O banco respondeu OK, mas gravou 0 linhas. Isso é RLS bloqueando o acesso.';
         addSystemLog('warning', 'Retorno vazio', warningMsg);
-        alert('AVISO: ' + warningMsg);
         throw new Error(warningMsg);
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Erro desconhecido';
       console.error('Erro fatal:', e);
-      alert('FALHA NA IMPORTAÇÃO: ' + msg);
       addSystemLog('error', 'Falha na importação', msg);
       
       // Fallback local se falhar
@@ -283,7 +291,6 @@ const App: React.FC = () => {
         active: true
       }));
       setMonitors(prev => [...prev, ...newOnes]);
-      alert(`Os dados foram carregados apenas temporariamente.\nMotivo: ${msg}`);
     }
   };
 
@@ -497,7 +504,7 @@ const App: React.FC = () => {
             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <span className="font-bold text-2xl tracking-tight">D.O. PMSP Monitor <span className="text-[10px] opacity-50 font-normal ml-2">v0.5.2-DEBUG</span></span>
+            <span className="font-bold text-2xl tracking-tight">D.O. PMSP Monitor</span>
           </div>
           <div className="max-w-md">
             <h1 className="text-5xl font-extrabold mb-6 leading-tight">Monitoramento Inteligente do Diário Oficial.</h1>
