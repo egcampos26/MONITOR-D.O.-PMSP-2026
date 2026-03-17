@@ -221,41 +221,48 @@ const App: React.FC = () => {
   const importMonitors = async (imported: Omit<ServerMonitor, 'id' | 'createdAt'>[]) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Sessão expirada. Faça login novamente.');
-
-      addSystemLog('info', 'Iniciando importação...', `Processando ${imported.length} registros.`);
+      if (!session) throw new Error('Sessão expirada. Faça login no banco de dados!');
+      addSystemLog('info', 'Sessão verificada para importação', { userId: session.user.id, records: imported.length });
 
       // Inserção em lote (Bulk Insert)
-      // Incluindo explicitamente o user_id para garantir consistência em lote
+      // Forçando o user_id explicitamente para cada linha garantir que o RLS não descarte nada
+      const insertData = imported.map(m => ({
+        name: m.name || 'Sem Nome',
+        rf: m.rf || '0',
+        role: m.role || '',
+        notes: m.notes || '',
+        active: true,
+        user_id: session.user.id
+      }));
+
+      addSystemLog('info', 'Enviando ao Supabase...', `Total: ${insertData.length} registros.`);
+
       const { data, error } = await supabase
         .from('monitors')
-        .insert(imported.map(m => ({
-          name: m.name,
-          rf: m.rf,
-          role: m.role,
-          notes: m.notes,
-          active: true,
-          user_id: session.user.id // Explicitamente setado como no addMonitor manual
-        })))
+        .insert(insertData)
         .select();
 
       if (error) {
-        console.error('Erro na importação Supabase:', error);
+        console.error('Erro retornado pelo Supabase (Bulk):', error);
         throw error;
       }
 
-      if (data && data.length > 0) {
+      const rowsInserted = data?.length || 0;
+
+      if (rowsInserted > 0) {
         setMonitors(prev => {
           const existingIds = new Set(prev.map(p => p.id));
-          const onlyNew = data.filter(d => !existingIds.has(d.id));
+          const onlyNew = data!.filter(d => !existingIds.has(d.id));
           const updated = [...prev, ...onlyNew];
-          // Sincroniza localmente IMEDIATAMENTE para evitar que o re-fetch limpe
           saveToLocalStorage('dosp_monitors', updated);
           return updated;
         });
         
-        addSystemLog('success', 'Importação concluída e salva no banco', `${data.length} servidores.`);
-        alert(`${data.length} servidores importados e salvos com sucesso no seu banco de dados!`);
+        addSystemLog('success', 'Banco Corretamente Atualizado', `${rowsInserted} servidores salvos permanentemente.`);
+        alert(`${rowsInserted} servidores foram gravados com sucesso no banco de dados.`);
+      } else {
+        addSystemLog('warning', 'Retorno vazio do banco de dados', 'Nenhum erro reportado, mas 0 linhas foram inseridas. Verifique permissões RLS.');
+        throw new Error('O servidor respondeu com sucesso, mas não gravou os dados. Isso geralmente acontece por falta de permissão.');
       }
     } catch (e) {
       console.error('Erro fatal:', e);

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { ServerMonitor } from '../types';
 import * as XLSX from 'xlsx';
 import { normalizeString } from '../services/utils';
+import { addSystemLog } from '../services/logService';
 
 interface MonitorListProps {
   monitors: ServerMonitor[];
