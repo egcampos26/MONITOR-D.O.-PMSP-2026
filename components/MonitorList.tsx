@@ -43,6 +43,7 @@ const MonitorList: React.FC<MonitorListProps> = ({ monitors, onAdd, onDelete, on
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    alert(`DEBUG: Arquivo selecionado: ${file.name}. Iniciando leitura...`);
 
     setIsImporting(true);
     const reader = new FileReader();
@@ -107,7 +108,7 @@ const MonitorList: React.FC<MonitorListProps> = ({ monitors, onAdd, onDelete, on
         }
 
         if (imported.length > 0) {
-          addSystemLog('info', 'Excel processado', `${imported.length} linhas encontradas. Colunas: ${identifiedCols.join(', ')}`);
+          alert(`DEBUG: ${imported.length} servidores identificados no Excel. Chamando onImport...`);
           onImport(imported);
         } else {
           alert("Nenhum dado válido encontrado nas linhas abaixo do cabeçalho.");

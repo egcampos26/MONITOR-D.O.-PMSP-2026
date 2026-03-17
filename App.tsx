@@ -219,6 +219,7 @@ const App: React.FC = () => {
   };
 
   const importMonitors = async (imported: Omit<ServerMonitor, 'id' | 'createdAt'>[]) => {
+    alert(`DEBUG: importMonitors iniciada no App.tsx com ${imported.length} registros.`);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sessão expirada. Faça login no banco de dados!');
