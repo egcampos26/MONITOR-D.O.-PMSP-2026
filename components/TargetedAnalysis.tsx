@@ -132,11 +132,7 @@ const TargetedAnalysis: React.FC<TargetedAnalysisProps> = ({ monitors, onFinish 
                   />
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-slate-900">{m.name}</p>
-                    <div className="flex items-center gap-2 text-[10px] text-slate-500">
-                      <span className="font-bold text-slate-400 capitalize">{m.role}</span>
-                      {m.rf && <span>• RF {m.rf}</span>}
-                      {m.schoolName && <span className="text-blue-600 font-bold">• {m.schoolName}</span>}
-                    </div>
+                    <p className="text-xs text-slate-500">{m.role} {m.rf ? `• ${m.rf}` : ''}</p>
                   </div>
                 </div>
               ))}
@@ -157,14 +153,14 @@ const TargetedAnalysis: React.FC<TargetedAnalysisProps> = ({ monitors, onFinish 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input 
                   type="text" 
-                  placeholder="Nome Completo"
+                  placeholder="Nome ou Unidade"
                   value={tempName}
                   onChange={e => setTempName(e.target.value)}
                   className="w-full text-sm p-2.5 rounded-lg border border-indigo-200 outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <input 
                   type="text" 
-                  placeholder="RF"
+                  placeholder="RF ou CIE"
                   value={tempRf}
                   onChange={e => setTempRf(e.target.value)}
                   className="w-full text-sm p-2.5 rounded-lg border border-indigo-200 outline-none focus:ring-2 focus:ring-indigo-500"
@@ -173,7 +169,7 @@ const TargetedAnalysis: React.FC<TargetedAnalysisProps> = ({ monitors, onFinish 
               <div className="flex gap-2">
                 <input 
                   type="text" 
-                  placeholder="Cargo/Função (Opcional)"
+                  placeholder="Cargo ou Tipo (Opcional)"
                   value={tempRole}
                   onChange={e => setTempRole(e.target.value)}
                   className="flex-1 text-sm p-2.5 rounded-lg border border-indigo-200 outline-none focus:ring-2 focus:ring-indigo-500"

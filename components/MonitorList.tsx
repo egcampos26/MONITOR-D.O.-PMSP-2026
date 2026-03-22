@@ -19,28 +19,16 @@ const MonitorList: React.FC<MonitorListProps> = ({ monitors, onAdd, onDelete, on
   const [newName, setNewName] = useState('');
   const [newRf, setNewRf] = useState('');
   const [newRole, setNewRole] = useState('');
-  const [newSchoolName, setNewSchoolName] = useState('');
-  const [newSchoolNumber, setNewSchoolNumber] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [isImporting, setIsImporting] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newRf || !newRole) return;
-    onAdd({ 
-      name: newName, 
-      rf: newRf, 
-      role: newRole, 
-      schoolName: newSchoolName,
-      schoolNumber: newSchoolNumber,
-      notes: newNotes, 
-      active: true 
-    });
+    onAdd({ name: newName, rf: newRf, role: newRole, notes: newNotes, active: true });
     setNewName('');
     setNewRf('');
     setNewRole('');
-    setNewSchoolName('');
-    setNewSchoolNumber('');
     setNewNotes('');
     setShowAdd(false);
   };
@@ -83,10 +71,8 @@ const MonitorList: React.FC<MonitorListProps> = ({ monitors, onAdd, onDelete, on
         // Mapeamento extra flexível de colunas
         const colMap = {
           name: findHeaderIndex(headers, ['nome', 'servidor', 'completo', 'name', 'serv', 'funcionario', 'funcionário']),
-          rf: findHeaderIndex(headers, ['rf', 'registro', 'funcional', 'matricula', 'matrícula', 'reg']),
+          rf: findHeaderIndex(headers, ['rf', 'registro', 'funcional', 'matricula', 'matrícula', 'reg', 'cie', 'unidade']),
           role: findHeaderIndex(headers, ['cargo', 'funcao', 'função', 'role', 'atribuicao', 'atribuição', 'posicao', 'posição']),
-          schoolName: findHeaderIndex(headers, ['escola', 'unidade', 'ue', 'school', 'local']),
-          schoolNumber: findHeaderIndex(headers, ['cie', 'numero', 'número', 'codigo', 'código']),
           notes: findHeaderIndex(headers, ['obs', 'observacao', 'observação', 'notas', 'notes', 'comentário', 'memo'])
         };
 
@@ -110,8 +96,6 @@ const MonitorList: React.FC<MonitorListProps> = ({ monitors, onAdd, onDelete, on
           const name = colMap.name !== -1 ? String(row[colMap.name] || '').trim() : '';
           const rf = colMap.rf !== -1 ? String(row[colMap.rf] || '').trim() : '';
           const role = colMap.role !== -1 ? String(row[colMap.role] || '').trim() : 'Não informado';
-          const schoolName = colMap.schoolName !== -1 ? String(row[colMap.schoolName] || '').trim() : '';
-          const schoolNumber = colMap.schoolNumber !== -1 ? String(row[colMap.schoolNumber] || '').trim() : '';
           const notes = colMap.notes !== -1 ? String(row[colMap.notes] || '').trim() : '';
 
           // Só importa se tiver dados mínimos
@@ -120,8 +104,6 @@ const MonitorList: React.FC<MonitorListProps> = ({ monitors, onAdd, onDelete, on
               name: name.toUpperCase(), 
               rf: rf, 
               role: role,
-              schoolName: schoolName,
-              schoolNumber: schoolNumber,
               notes: notes, 
               active: true 
             });
@@ -200,51 +182,33 @@ const MonitorList: React.FC<MonitorListProps> = ({ monitors, onAdd, onDelete, on
         <div className="bg-white p-6 rounded-xl border border-blue-100 shadow-sm animate-in slide-in-from-top duration-300">
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="md:col-span-1">
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome / Unidade</label>
               <input 
                 required
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
                 className="w-full px-3 py-2 rounded border border-gray-200 outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Ex: João da Silva"
+                placeholder="Ex: João Silva ou EMEF Tarsila"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">RF</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">RF / CIE</label>
               <input 
                 required
                 value={newRf}
                 onChange={e => setNewRf(e.target.value)}
                 className="w-full px-3 py-2 rounded border border-gray-200 outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Ex: 123.456.7"
+                placeholder="Ex: 1234567"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cargo</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cargo / Tipo</label>
               <input 
                 required
                 value={newRole}
                 onChange={e => setNewRole(e.target.value)}
                 className="w-full px-3 py-2 rounded border border-gray-200 outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Ex: Assessor II"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Escola / Unidade</label>
-              <input 
-                value={newSchoolName}
-                onChange={e => setNewSchoolName(e.target.value)}
-                className="w-full px-3 py-2 rounded border border-gray-200 outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Ex: EMEF Tarsila do Amaral"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CIE / Nº</label>
-              <input 
-                value={newSchoolNumber}
-                onChange={e => setNewSchoolNumber(e.target.value)}
-                className="w-full px-3 py-2 rounded border border-gray-200 outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Ex: 123456"
+                placeholder="Ex: Assessor ou Escola"
               />
             </div>
             <div className="md:col-span-2 flex items-end gap-2">
@@ -276,10 +240,9 @@ const MonitorList: React.FC<MonitorListProps> = ({ monitors, onAdd, onDelete, on
         <table className="w-full text-left">
           <thead className="bg-gray-50 border-b border-gray-100 text-xs text-slate-500 uppercase font-bold">
             <tr>
-              <th className="px-6 py-4">Servidor</th>
-              <th className="px-6 py-4">RF</th>
-              <th className="px-6 py-4">Cargo</th>
-              <th className="px-6 py-4">Escola (CIE)</th>
+              <th className="px-6 py-4">Nome / Unidade</th>
+              <th className="px-6 py-4">RF / CIE</th>
+              <th className="px-6 py-4">Cargo / Função</th>
               <th className="px-6 py-4">Observações</th>
               <th className="px-6 py-4 text-center">Status</th>
               <th className="px-6 py-4 text-right">Ações</th>
@@ -291,12 +254,6 @@ const MonitorList: React.FC<MonitorListProps> = ({ monitors, onAdd, onDelete, on
                 <td className="px-6 py-4 font-semibold text-slate-900">{m.name}</td>
                 <td className="px-6 py-4 font-mono text-slate-500">{m.rf}</td>
                 <td className="px-6 py-4 text-slate-600">{m.role}</td>
-                <td className="px-6 py-4 text-slate-600">
-                  <div className="flex flex-col">
-                    <span className="font-medium">{m.schoolName || '-'}</span>
-                    {m.schoolNumber && <span className="text-[10px] text-slate-400 font-mono">CIE: {m.schoolNumber}</span>}
-                  </div>
-                </td>
                 <td className="px-6 py-4 text-slate-500 max-w-xs truncate">{m.notes || '-'}</td>
                 <td className="px-6 py-4 text-center">
                   <button 
