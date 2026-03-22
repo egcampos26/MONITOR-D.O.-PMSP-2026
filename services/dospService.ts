@@ -144,6 +144,8 @@ export const analyzeEdition = async (editionData: any[], monitors: ServerMonitor
                   ...res,
                   id: crypto.randomUUID(),
                   monitorId: monitor.id,
+                  monitorName: monitor.name,
+                  monitorRf: monitor.rf,
                   url: materia.link || generateDospLink(analysisDate, monitor.name, materia.documento)
                 });
               }

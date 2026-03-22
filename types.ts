@@ -4,6 +4,8 @@ export interface ServerMonitor {
   name: string;
   rf: string;
   role: string;
+  schoolName?: string;
+  schoolNumber?: string;
   notes?: string;
   active: boolean;
   createdAt: number;
@@ -29,6 +31,8 @@ export interface DospOccurrence {
   monitorId: string;
   monitorName: string;
   monitorRf: string;
+  schoolName?: string;
+  schoolNumber?: string;
   title: string;
   content: string;
   page?: string;

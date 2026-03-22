@@ -132,7 +132,11 @@ const TargetedAnalysis: React.FC<TargetedAnalysisProps> = ({ monitors, onFinish 
                   />
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-slate-900">{m.name}</p>
-                    <p className="text-xs text-slate-500">{m.role} {m.rf ? `• RF ${m.rf}` : ''}</p>
+                    <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                      <span className="font-bold text-slate-400 capitalize">{m.role}</span>
+                      {m.rf && <span>• RF {m.rf}</span>}
+                      {m.schoolName && <span className="text-blue-600 font-bold">• {m.schoolName}</span>}
+                    </div>
                   </div>
                 </div>
               ))}

@@ -89,6 +89,8 @@ const App: React.FC = () => {
             monitorId: r.monitor_id,
             monitorName: r.monitor_name,
             monitorRf: r.monitor_rf,
+            schoolName: r.school_name,
+            schoolNumber: r.school_number,
             title: r.title,
             content: r.content,
             page: r.page,
@@ -184,6 +186,8 @@ const App: React.FC = () => {
           name: newM.name,
           rf: newM.rf,
           role: newM.role,
+          school_name: newM.schoolName,
+          school_number: newM.schoolNumber,
           notes: newM.notes,
           active: true
         }])
@@ -243,6 +247,8 @@ const App: React.FC = () => {
         name: m.name || 'Sem Nome',
         rf: m.rf || '0',
         role: m.role || '',
+        school_name: m.schoolName || '',
+        school_number: m.schoolNumber || '',
         notes: m.notes || '',
         active: true,
         user_id: session.user.id
@@ -440,6 +446,8 @@ const App: React.FC = () => {
           monitor_id: r.monitorId.startsWith('temp-') ? null : r.monitorId,
           monitor_name: r.monitorName,
           monitor_rf: r.monitorRf,
+          school_name: r.schoolName,
+          school_number: r.schoolNumber,
           title: r.title,
           content: r.content,
           page: r.page,
@@ -468,7 +476,22 @@ const App: React.FC = () => {
         setHistory(updatedHistory.map(h => ({
           ...h,
           totalOccurrences: h.total_occurrences,
-          monitorsFound: h.monitors_found
+          monitorsFound: h.monitors_found,
+          results: (h.results || []).map((r: any) => ({
+            id: r.id,
+            monitorId: r.monitor_id,
+            monitorName: r.monitor_name,
+            monitorRf: r.monitor_rf,
+            schoolName: r.school_name,
+            schoolNumber: r.school_number,
+            title: r.title,
+            content: r.content,
+            page: r.page,
+            url: r.url,
+            confidence: r.confidence,
+            matchType: r.match_type,
+            status: r.status
+          }))
         })));
       }
 
