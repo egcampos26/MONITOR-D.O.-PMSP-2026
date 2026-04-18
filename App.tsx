@@ -80,7 +80,7 @@ const App: React.FC = () => {
 
       if (historyError) throw historyError;
       if (historyData) {
-        setHistory(historyData.map(h => ({
+        setHistory(sortHistory(historyData.map(h => ({
           ...h,
           totalOccurrences: h.total_comments || h.total_occurrences,
           monitorsFound: h.monitors_found,
@@ -98,7 +98,7 @@ const App: React.FC = () => {
             matchType: r.match_type,
             status: r.status
           }))
-        })));
+        }))));
       }
 
       // Carregar Agendamentos do Supabase (agora com RLS)
@@ -439,18 +439,20 @@ const App: React.FC = () => {
   };
 
   const sortHistory = (list: AnalysisHistory[]) => {
+    const parseDate = (dStr: string) => {
+      if (dStr.includes('/')) {
+        const [d, m, y] = dStr.split('/').map(Number);
+        return new Date(y, m - 1, d).getTime();
+      } else if (dStr.includes('-')) {
+        return new Date(dStr).getTime();
+      }
+      return 0;
+    };
+
     return [...list].sort((a, b) => {
-      // Tentar split por / (novo) ou - (velho)
-      const parseDate = (dStr: string) => {
-        if (dStr.includes('/')) {
-          const [d, m, y] = dStr.split('/').map(Number);
-          return new Date(y, m - 1, d).getTime();
-        } else if (dStr.includes('-')) {
-          return new Date(dStr).getTime();
-        }
-        return 0;
-      };
-      return parseDate(b.date) - parseDate(a.date);
+      const dateDiff = parseDate(b.date) - parseDate(a.date);
+      if (dateDiff !== 0) return dateDiff;
+      return (b.timestamp || 0) - (a.timestamp || 0);
     });
   };
 
@@ -506,7 +508,7 @@ const App: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (!loadError && updatedHistory) {
-        setHistory(updatedHistory.map(h => ({
+        setHistory(sortHistory(updatedHistory.map(h => ({
           ...h,
           totalOccurrences: h.total_occurrences,
           monitorsFound: h.monitors_found,
@@ -523,7 +525,7 @@ const App: React.FC = () => {
             matchType: r.match_type,
             status: r.status
           }))
-        })));
+        }))));
       }
 
     } catch (e) {
