@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -10,16 +10,34 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, activeTab, setActiveTab }) => {
+  const [isAnalysisOpen, setIsAnalysisOpen] = useState(activeTab.startsWith('history'));
+
   if (!user) return <>{children}</>;
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
     { id: 'targeted-analysis', label: 'Analisar Monitorados', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
-    { id: 'history', label: 'Análise', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+    { 
+      id: 'history', 
+      label: 'Análise', 
+      icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
+      children: [
+        { id: 'history:data', label: 'DATA' },
+        { id: 'history:monitors', label: 'MONITORADOS' }
+      ]
+    },
     { id: 'scheduler', label: 'Agendamento', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
     { id: 'monitors', label: 'Monitorados', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z' },
     { id: 'logs', label: 'Logs do Sistema', icon: 'M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
   ];
+
+  const handleItemClick = (item: any) => {
+    if (item.children) {
+      setIsAnalysisOpen(!isAnalysisOpen);
+    } else {
+      setActiveTab(item.id);
+    }
+  };
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -36,22 +54,54 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, activeTab, se
           </div>
           
           <nav className="space-y-1">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-200 group ${
-                  activeTab === item.id 
-                    ? 'bg-blue-600 text-white shadow-md' 
-                    : 'text-gray-400 hover:bg-slate-800/50 hover:text-white'
-                }`}
-              >
-                <svg className={`w-5 h-5 transition-colors ${activeTab === item.id ? 'text-white' : 'text-gray-500 group-hover:text-blue-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
-                </svg>
-                <span className="text-sm font-medium">{item.label}</span>
-              </button>
-            ))}
+            {navItems.map((item) => {
+              const isParentActive = activeTab.startsWith(item.id);
+              const hasChildren = !!item.children;
+              const isOpen = hasChildren && (isAnalysisOpen || isParentActive);
+
+              return (
+                <div key={item.id} className="space-y-1">
+                  <button
+                    onClick={() => handleItemClick(item)}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-md transition-all duration-200 group ${
+                      activeTab === item.id || (hasChildren && isParentActive && !isAnalysisOpen)
+                        ? 'bg-blue-600 text-white shadow-md' 
+                        : 'text-gray-400 hover:bg-slate-800/50 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <svg className={`w-5 h-5 transition-colors ${activeTab.startsWith(item.id) ? 'text-white' : 'text-gray-500 group-hover:text-blue-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+                      </svg>
+                      <span className="text-sm font-medium">{item.label}</span>
+                    </div>
+                    {hasChildren && (
+                      <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    )}
+                  </button>
+                  
+                  {hasChildren && isOpen && (
+                    <div className="ml-9 space-y-1 animate-in slide-in-from-top-1 duration-200">
+                      {item.children.map((child) => (
+                        <button
+                          key={child.id}
+                          onClick={() => setActiveTab(child.id)}
+                          className={`w-full flex items-center px-4 py-2 rounded-md text-xs font-semibold tracking-wider transition-all ${
+                            activeTab === child.id 
+                              ? 'text-blue-400 bg-blue-400/10' 
+                              : 'text-gray-500 hover:text-white hover:bg-slate-800/30'
+                          }`}
+                        >
+                          {child.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </nav>
         </div>
         
@@ -103,3 +153,4 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, activeTab, se
 };
 
 export default Layout;
+

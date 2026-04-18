@@ -505,7 +505,7 @@ const App: React.FC = () => {
       setHistory(prev => sortHistory([newEntry, ...prev]));
     }
     if (shouldRedirect) {
-      setActiveTab('history');
+      setActiveTab('history:data');
     }
   };
 
@@ -596,11 +596,12 @@ const App: React.FC = () => {
           onImport={importMonitors}
         />
       )}
-      {activeTab === 'history' && (
+      {activeTab.startsWith('history') && (
         <HistoryView 
           history={history} 
           onClearHistory={clearHistory} 
           onUpdateOccurrence={updateOccurrenceStatus} 
+          activeSubTab={activeTab.split(':')[1] as 'data' | 'monitors' || 'data'}
         />
       )}
       {activeTab === 'logs' && (

@@ -9,10 +9,10 @@ interface HistoryViewProps {
   history: AnalysisHistory[];
   onClearHistory: (ids?: string[]) => void;
   onUpdateOccurrence: (historyId: string, occurrenceId: string, status: 'verified' | 'dismissed' | 'pending') => void;
+  activeSubTab: 'data' | 'monitors';
 }
 
-const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory, onUpdateOccurrence }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'data' | 'monitors'>('data');
+const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory, onUpdateOccurrence, activeSubTab }) => {
   const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDeletionMode, setIsDeletionMode] = useState(false);
@@ -123,29 +123,6 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory, onUp
         <div>
           <h2 className="text-2xl font-bold text-slate-900 mb-1">Análise do Diário Oficial</h2>
           <p className="text-slate-500 text-sm">Visualize ocorrências filtradas por data ou por monitorado.</p>
-        </div>
-        
-        <div className="flex bg-slate-100 p-1 rounded-xl w-fit border border-slate-200 shadow-inner">
-          <button
-            onClick={() => setActiveSubTab('data')}
-            className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
-              activeSubTab === 'data' 
-                ? 'bg-white text-blue-600 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            DATA
-          </button>
-          <button
-            onClick={() => setActiveSubTab('monitors')}
-            className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
-              activeSubTab === 'monitors' 
-                ? 'bg-white text-blue-600 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            MONITORADOS
-          </button>
         </div>
       </div>
 
