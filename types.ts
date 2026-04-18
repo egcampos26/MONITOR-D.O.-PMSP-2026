@@ -21,7 +21,7 @@ export interface ScheduledAnalysis {
   time: string; // HH:mm
   active: boolean;
   format: DospFormat;
-  monitor_ids?: string[];
+  monitorIds?: string[];
   createdAt: number;
 }
 

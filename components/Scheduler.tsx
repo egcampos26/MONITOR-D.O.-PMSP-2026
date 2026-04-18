@@ -6,12 +6,14 @@ interface SchedulerProps {
   schedules: ScheduledAnalysis[];
   monitors: ServerMonitor[];
   onAdd: (schedule: Omit<ScheduledAnalysis, 'id' | 'createdAt'>) => void;
+  onUpdate: (id: string, updates: Partial<ScheduledAnalysis>) => void;
   onDelete: (id: string) => void;
   onToggle: (id: string) => void;
 }
 
-const Scheduler: React.FC<SchedulerProps> = ({ schedules, monitors, onAdd, onDelete, onToggle }) => {
+const Scheduler: React.FC<SchedulerProps> = ({ schedules, monitors, onAdd, onUpdate, onDelete, onToggle }) => {
   const [showAdd, setShowAdd] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [frequency, setFrequency] = useState<Frequency>('daily');
   const [format, setFormat] = useState<DospFormat>('JSON');
@@ -23,19 +25,43 @@ const Scheduler: React.FC<SchedulerProps> = ({ schedules, monitors, onAdd, onDel
     e.preventDefault();
     if (!name) return;
     
-    onAdd({
+    const scheduleData = {
       name,
       frequency,
       format,
       time,
       nextRun: new Date(`${startDate}T${time}`).toISOString(),
-      active: true,
-      monitor_ids: selectedMonitorIds.size > 0 ? Array.from(selectedMonitorIds) : undefined
-    });
+      monitorIds: selectedMonitorIds.size > 0 ? Array.from(selectedMonitorIds) : undefined
+    };
+
+    if (editingId) {
+      onUpdate(editingId, scheduleData);
+    } else {
+      onAdd({
+        ...scheduleData,
+        active: true
+      });
+    }
     
+    resetForm();
+  };
+
+  const resetForm = () => {
     setName('');
+    setEditingId(null);
     setSelectedMonitorIds(new Set());
     setShowAdd(false);
+  };
+
+  const handleEdit = (s: ScheduledAnalysis) => {
+    setEditingId(s.id);
+    setName(s.name);
+    setFrequency(s.frequency);
+    setFormat(s.format);
+    setTime(s.time);
+    setSelectedMonitorIds(new Set(s.monitorIds || []));
+    setShowAdd(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const toggleSelectAll = () => {
@@ -83,7 +109,9 @@ const Scheduler: React.FC<SchedulerProps> = ({ schedules, monitors, onAdd, onDel
 
       {showAdd && (
         <div className="bg-white p-6 rounded-xl border border-blue-100 shadow-sm animate-in slide-in-from-top duration-300">
-          <h3 className="text-lg font-bold text-slate-900 mb-4">Configurar Nova Automação</h3>
+          <h3 className="text-lg font-bold text-slate-900 mb-4">
+            {editingId ? 'Editar Automação' : 'Configurar Nova Automação'}
+          </h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -182,7 +210,7 @@ const Scheduler: React.FC<SchedulerProps> = ({ schedules, monitors, onAdd, onDel
             <div className="flex justify-end gap-3 pt-2">
               <button 
                 type="button"
-                onClick={() => setShowAdd(false)}
+                onClick={resetForm}
                 className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
               >
                 Cancelar
@@ -191,7 +219,7 @@ const Scheduler: React.FC<SchedulerProps> = ({ schedules, monitors, onAdd, onDel
                 type="submit"
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-bold transition-colors"
               >
-                Salvar Agendamento
+                {editingId ? 'Salvar Alterações' : 'Salvar Agendamento'}
               </button>
             </div>
           </form>
@@ -224,13 +252,22 @@ const Scheduler: React.FC<SchedulerProps> = ({ schedules, monitors, onAdd, onDel
                   </span>
                   <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono uppercase">{s.format}</span>
                   <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-bold">
-                    {s.monitor_ids ? `${s.monitor_ids.length} selecionados` : 'Todos ativos'}
+                    {s.monitorIds ? `${s.monitorIds.length} selecionados` : 'Todos ativos'}
                   </span>
                 </div>
               </div>
             </div>
             
             <div className="flex items-center gap-3 self-end md:self-center">
+              <button 
+                onClick={() => handleEdit(s)}
+                className="p-2 text-slate-300 hover:text-blue-500 transition-colors"
+                title="Editar agendamento"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
               <button 
                 onClick={() => onToggle(s.id)}
                 className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase transition-colors ${

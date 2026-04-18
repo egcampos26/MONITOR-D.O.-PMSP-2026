@@ -107,7 +107,12 @@ const App: React.FC = () => {
         .order('created_at', { ascending: false });
       
       if (!scheduleError && scheduleData) {
-        setSchedules(scheduleData);
+        setSchedules(scheduleData.map(s => ({
+          ...s,
+          nextRun: s.next_run,
+          monitorIds: s.monitor_ids,
+          createdAt: s.created_at ? new Date(s.created_at).getTime() : Date.now()
+        })));
       }
 
     } catch (e) {
@@ -305,7 +310,8 @@ const App: React.FC = () => {
           time: newS.time,
           active: true,
           format: newS.format || 'JSON',
-          monitor_ids: newS.monitor_ids
+          monitor_ids: newS.monitorIds,
+          next_run: newS.nextRun
         }])
         .select()
         .single();
@@ -351,6 +357,39 @@ const App: React.FC = () => {
       ));
     } catch (e) {
       console.error('Erro ao toggle agendamento:', e);
+    }
+  };
+
+  const updateSchedule = async (id: string, updates: Partial<ScheduledAnalysis>) => {
+    try {
+      const dbUpdates: any = { ...updates };
+      if (updates.nextRun) {
+        dbUpdates.next_run = updates.nextRun;
+        delete dbUpdates.nextRun;
+      }
+      if (updates.monitorIds) {
+        dbUpdates.monitor_ids = updates.monitorIds;
+        delete dbUpdates.monitorIds;
+      }
+
+      const { data, error } = await supabase
+        .from('scheduled_analyses')
+        .update(dbUpdates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setSchedules(prev => prev.map(s => s.id === id ? {
+          ...data,
+          nextRun: data.next_run,
+          monitorIds: data.monitor_ids
+        } : s));
+        addSystemLog('success', 'Agendamento atualizado no Supabase', `Nome: ${data.name}`);
+      }
+    } catch (e) {
+      console.error('Erro ao atualizar agendamento:', e);
     }
   };
 
@@ -584,6 +623,7 @@ const App: React.FC = () => {
           schedules={schedules} 
           monitors={monitors}
           onAdd={addSchedule} 
+          onUpdate={updateSchedule}
           onDelete={deleteSchedule} 
           onToggle={toggleSchedule}
         />
