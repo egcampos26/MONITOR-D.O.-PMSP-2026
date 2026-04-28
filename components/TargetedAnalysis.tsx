@@ -122,7 +122,7 @@ const TargetedAnalysis: React.FC<TargetedAnalysisProps> = ({ monitors, onFinish 
           
           // 3. Save (but don't redirect yet)
           const isLast = i === targetDates.length - 1;
-          await (onFinish as any)(currentDay, format, results, false);
+          await (onFinish as any)(currentDay, format, results, false, true);
           successCount++;
         } else {
           errors.push(`${displayDate}: Nenhuma matéria encontrada (Edição não disponível).`);
@@ -152,8 +152,8 @@ const TargetedAnalysis: React.FC<TargetedAnalysisProps> = ({ monitors, onFinish 
         alert(`Sucesso! Foram analisados ${successCount} dia(s) corretamente.`);
       }
 
-      // Final redirect
-      (onFinish as any)(targetDates[targetDates.length - 1], format, [], true);
+      // Final redirect (don't save a new record here)
+      (onFinish as any)(targetDates[targetDates.length - 1], format, [], true, false);
     }, 1000);
   };
 

@@ -456,96 +456,99 @@ const App: React.FC = () => {
     });
   };
 
-  const handleAnalysisFinish = async (date: string, format: DospFormat, results: DospOccurrence[], shouldRedirect: boolean = true) => {
-    try {
-      const uniqueMonitors = new Set(results.map(r => r.monitorId)).size;
-      const [y, m, d] = date.split('-');
-      const formattedDate = `${d}/${m}/${y}`;
+  const handleAnalysisFinish = async (date: string, format: DospFormat, results: DospOccurrence[], shouldRedirect: boolean = true, saveRecord: boolean = true) => {
+    if (saveRecord) {
+      try {
+        const uniqueMonitors = new Set(results.map(r => r.monitorId)).size;
+        const [y, m, d] = date.split('-');
+        const formattedDate = `${d}/${m}/${y}`;
 
-      // 1. Salvar Cabeçalho do Histórico
-      const { data: historyData, error: historyError } = await supabase
-        .from('analysis_history')
-        .insert([{
-          date: formattedDate,
-          format,
-          total_occurrences: results.length,
-          monitors_found: uniqueMonitors
-        }])
-        .select()
-        .single();
+        // 1. Salvar Cabeçalho do Histórico
+        const { data: historyData, error: historyError } = await supabase
+          .from('analysis_history')
+          .insert([{
+            date: formattedDate,
+            format,
+            total_occurrences: results.length,
+            monitors_found: uniqueMonitors
+          }])
+          .select()
+          .single();
 
-      if (historyError) throw historyError;
+        if (historyError) throw historyError;
 
-      // 2. Salvar Ocorrências Individuais
-      if (results.length > 0 && historyData) {
-        const occurrencesBatch = results.map(r => ({
-          history_id: historyData.id,
-          monitor_id: r.monitorId.startsWith('temp-') ? null : r.monitorId,
-          monitor_name: r.monitorName,
-          monitor_rf: r.monitorRf,
-          title: r.title,
-          content: r.content,
-          page: r.page,
-          url: r.url,
-          confidence: r.confidence,
-          match_type: r.matchType,
-          status: 'pending'
-        }));
-
-        const { error: occError } = await supabase
-          .from('occurrences')
-          .insert(occurrencesBatch);
-
-        if (occError) throw occError;
-      }
-
-      addSystemLog('success', 'Análise salva no Supabase', `${results.length} ocorrências persistidas.`);
-      
-      // Recarregar histórico para refletir mudanças
-      const { data: updatedHistory, error: loadError } = await supabase
-        .from('analysis_history')
-        .select('*, results:occurrences(*)')
-        .order('created_at', { ascending: false });
-
-      if (!loadError && updatedHistory) {
-        setHistory(sortHistory(updatedHistory.map(h => ({
-          ...h,
-          totalOccurrences: h.total_occurrences,
-          monitorsFound: h.monitors_found,
-          results: (h.results || []).map((r: any) => ({
-            id: r.id,
-            monitorId: r.monitor_id,
-            monitorName: r.monitor_name,
-            monitorRf: r.monitor_rf,
+        // 2. Salvar Ocorrências Individuais
+        if (results.length > 0 && historyData) {
+          const occurrencesBatch = results.map(r => ({
+            history_id: historyData.id,
+            monitor_id: r.monitorId.startsWith('temp-') ? null : r.monitorId,
+            monitor_name: r.monitorName,
+            monitor_rf: r.monitorRf,
             title: r.title,
             content: r.content,
             page: r.page,
             url: r.url,
             confidence: r.confidence,
-            matchType: r.match_type,
-            status: r.status
-          }))
-        }))));
-      }
+            match_type: r.matchType,
+            status: 'pending'
+          }));
 
-    } catch (e) {
-      console.error('Erro ao salvar análise no Supabase:', e);
-      addSystemLog('error', 'Falha ao salvar análise na nuvem', e instanceof Error ? e.message : String(e));
-      
-      // Fallback local para não perder o trabalho atual
-      const uniqueMonitors = new Set(results.map(r => r.monitorId)).size;
-      const [y, m, d] = date.split('-');
-      const formattedDate = `${d}/${m}/${y}`;
-      const newEntry: AnalysisHistory = {
-        id: crypto.randomUUID(),
-        date: formattedDate,
-        format,
-        totalOccurrences: results.length,
-        monitorsFound: uniqueMonitors,
-        timestamp: Date.now(),
-        results: results.map(r => ({ ...r, status: 'pending' }))
-      };
-      setHistory(prev => sortHistory([newEntry, ...prev]));
+          const { error: occError } = await supabase
+            .from('occurrences')
+            .insert(occurrencesBatch);
+
+          if (occError) throw occError;
+        }
+
+        addSystemLog('success', 'Análise salva no Supabase', `${results.length} ocorrências persistidas.`);
+        
+        // Recarregar histórico para refletir mudanças
+        const { data: updatedHistory, error: loadError } = await supabase
+          .from('analysis_history')
+          .select('*, results:occurrences(*)')
+          .order('created_at', { ascending: false });
+
+        if (!loadError && updatedHistory) {
+          setHistory(sortHistory(updatedHistory.map(h => ({
+            ...h,
+            totalOccurrences: h.total_occurrences,
+            monitorsFound: h.monitors_found,
+            timestamp: h.created_at ? new Date(h.created_at).getTime() : Date.now(),
+            results: (h.results || []).map((r: any) => ({
+              id: r.id,
+              monitorId: r.monitor_id,
+              monitorName: r.monitor_name,
+              monitorRf: r.monitor_rf,
+              title: r.title,
+              content: r.content,
+              page: r.page,
+              url: r.url,
+              confidence: r.confidence,
+              matchType: r.match_type,
+              status: r.status
+            }))
+          }))));
+        }
+
+      } catch (e) {
+        console.error('Erro ao salvar análise no Supabase:', e);
+        addSystemLog('error', 'Falha ao salvar análise na nuvem', e instanceof Error ? e.message : String(e));
+        
+        // Fallback local para não perder o trabalho atual
+        const uniqueMonitors = new Set(results.map(r => r.monitorId)).size;
+        const [y, m, d] = date.split('-');
+        const formattedDate = `${d}/${m}/${y}`;
+        const newEntry: AnalysisHistory = {
+          id: crypto.randomUUID(),
+          date: formattedDate,
+          format,
+          totalOccurrences: results.length,
+          monitorsFound: uniqueMonitors,
+          timestamp: Date.now(),
+          results: results.map(r => ({ ...r, status: 'pending' }))
+        };
+        setHistory(prev => sortHistory([newEntry, ...prev]));
+      }
     }
     if (shouldRedirect) {
       setActiveTab('history:data');
